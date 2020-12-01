@@ -1,5 +1,7 @@
 #include <iostream>
 
+#include "ap_error.h"
+
 enum class Months : unsigned int {January=1, February, March, April, May, June, July, August, September, October, November, December};
 
 std::string month_str(const Months month) {
@@ -29,7 +31,7 @@ std::string month_str(const Months month) {
 		case Months::December:
 			return "December";
 		default:
-			break;
+			AP_ASSERT(false) << "unknown month";
 	}
 
 	return "";
@@ -62,7 +64,7 @@ bool is_leap(const unsigned int year) {
 		return false;
 	}
 			
-	return true;
+	return year % 4 == 0;
 }
 
 class Date {
@@ -71,6 +73,8 @@ class Date {
 		unsigned int _day;
 	public:
 		Date(const unsigned int year, const Months month, const unsigned int day) : _year(year), _month(month), _day(day) {
+			//AP_ERROR_RANGE(month, 1, 12) << "Month must be between 1 and 12";
+			AP_ERROR_IN_RANGE(_day, 1, month_days(_month, year)) << "Month " << _month << "'s day in year " << _year << "  must be between 1 and " << month_days(_month, _year);
 		}
 
 		unsigned int year() const {
@@ -199,5 +203,7 @@ int main(int argc, char** argv) {
 	std::cout << "d{" << d << "} < d2{" << d2 << "}: " << (d < d2) << std::endl;
 	std::cout << "d{" << d << "} > d2{" << d2 << "}: " << (d > d2) << std::endl;
 	std::cout << "d{" << d << "} == d2{" << d2 << "}: " << (d == d2) << std::endl;
+
+	Date dError(2001, Months::February, 29);
 }
 

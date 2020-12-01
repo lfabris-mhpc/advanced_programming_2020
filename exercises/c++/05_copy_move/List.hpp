@@ -2,135 +2,183 @@
 #define __LIST_HPP__
 
 #include <iostream>
-#include <utility>
 #include <memory>
+#include <utility>
 
 enum class Insertion_method { push_back, push_front };
 
-template <class value_type>
-class List {
-	public:
-		// insert a new node with the value v according to the method m
-		// this method should be used to fill the list
-		void insert(const value_type& v, const Insertion_method m) {
-			switch (m) {
-				case Insertion_method::push_back:
-					this->push_back(v);
-					break;
-				case Insertion_method::push_front:
-					this->push_front(v);
-					break;
-				default:
-					break;
-			}
-		}
+template <class value_type> class List {
+public:
+    // insert a new node with the value v according to the method m
+    // this method should be used to fill the list
+    // two flavors: one with l-value refs, one with l-value refs
+    // both will feed into a universal ref internal method
+    // must not have universal ref in the interface: type deduction must be
+    // avoided
+    void insert(const value_type &v, const Insertion_method m) {
+        _insert(v, m);
+    }
 
-		// return the size of the list
-		std::size_t size() const {
-			return _size;
-		}
+    void insert(value_type &&v, const Insertion_method m) {
+        _insert(std::move(v), m);
+    }
 
-		// delete all the nodes of the list
-		void reset() {
-			head.reset();
-			_size = 0;
-		}
+    // return the size of the list
+    std::size_t size() const { return _size; }
 
-		// constructor(s) for List
-		List() : _size{}, head{} {
-		}
+    // delete all the nodes of the list
+    void reset() {
+        head.reset();
+        _size = 0;
+    }
 
-		// copy semantics (deep copy)
-		List(const List<value_type>& rhs) : List{} {
-			//std::cout << "List copy ctor" << std::endl;
-			for (const auto* iter = rhs.head.get(); iter; iter = iter->next.get()) {
-				this->push_back(iter->value);
-			}
-		}
+    // constructor(s) for List
+    List() = default;
 
-		List& operator=(const List& rhs) {
-			//std::cout << "List copy assignment ctor" << std::endl;
-			//not needed as the following move takes care of deleting the old values
-			//this->reset();
-			return *this = List<value_type>{rhs};
-		}
+    // copy semantics (deep copy)
+    List(const List<value_type> &rhs) : _size{rhs._size}, head{} {
+        if (rhs.head) {
+            head.reset(new node{rhs.head->value});
+            auto *last = head.get();
+            for (const auto *iter = rhs.head->next.get(); iter;
+                 iter = iter->next.get()) {
+                last->next.reset(new node{iter->value});
+                last = last->next.get();
+            }
+        }
+    }
 
-		// move semantics
-		//defaults are fine as they steal head and thus all the linked nodes
-		List(List&& rhs) = default;
-		
-		List& operator=(List&& rhs) = default;
+    List &operator=(const List &rhs) {
+        // not needed as the following move takes care of deleting the old
+        // values this->reset();
+        return *this = List<value_type>{rhs};
+    }
 
-		// destructor
-		//destructor of head cascades to linked nodes
-		~List() = default;
+    // move semantics
+    // defaults are fine as they steal head and thus all the linked nodes
+    List(List &&rhs) = default;
 
-		void pour(std::ostream& os) const {
-			os << "List(" << _size << ")[";
-			for (const auto* iter = this->head.get(); iter; iter = iter->next.get()) {
-				os << iter->value << " ";
-			}
-			os << "]";
-		}
+    List &operator=(List &&rhs) = default;
 
-	private:
-		// private struct node with the proper value_type
-		struct node {
-			value_type value;
-			std::unique_ptr<node> next;
+    // destructor
+    // destructor of head cascades to linked nodes
+    ~List() = default;
 
-			// implement suitable constructor(s) for node
-			node(const value_type& value) : value{value}, next{} {
-			}
+    friend void swap(List &a, List &b) {
+        auto tmp = std::move(a);
+        a = std::move(b);
+        b = std::move(tmp);
+    }
 
-			node(const value_type& value, std::unique_ptr<node>& next) : value{value}, next{std::move(next)} {
-			}
+    friend std::ostream &operator<<(std::ostream &os, const List &l) {
+        os << "List(" << l._size << ")[";
+        for (const auto *iter = l.head.get(); iter; iter = iter->next.get()) {
+            os << iter->value << " ";
+        }
+        os << "]";
 
-			// copy and move semantics if needed
-			node(const node& rhs) = delete;
-			node& operator=(const node& rhs) = delete;
+        return os;
+    }
 
-			node(node&& rhs) = default;
-			node& operator=(node&& rhs) = default;
+private:
+    // private struct node with the proper value_type
+    struct node {
+        value_type value;
+        std::unique_ptr<node> next;
 
-			// destructor
-			~node() = default;
-		};
+        // implement suitable constructor(s) for node
+        explicit node(const value_type &value) : value{value}, next{} {
+            std::cout << "l-value node ctor, nullptr" << std::endl;
+        }
 
-		// append the newly created node at the end of the list
-		void push_back(const value_type& v) {
-			//std::cout << "push_back(" << v << ") from size " << _size << std::endl;
-			if (head) {
-				auto* iter = head.get();
-				while (iter->next) {
-					iter = iter->next.get();
-				}
+        explicit node(value_type &&value) : value{value}, next{} {
+            std::cout << "r-value node ctor, nullptr" << std::endl;
+        }
 
-				iter->next = std::make_unique<node>(v);
-			} else {
-				head = std::make_unique<node>(v);
-			}
+        explicit node(const value_type &value, node *p)
+            : value{value}, next{p} {
+            std::cout << "l-value node ctor, ptr" << std::endl;
+        }
 
-			++_size;		
-		}
+        explicit node(value_type &&value, node *p) : value{value}, next{p} {
+            std::cout << "r-value node ctor, ptr" << std::endl;
+        }
 
-		// insert the newly created node in front of the list
-		void push_front(const value_type& v) {
-			//std::cout << "push_front(" << v << ") from size " << _size << std::endl;
-			head = std::make_unique<node>(v, head);
+        explicit node(const std::unique_ptr<node> &x)
+            : next{}, value{x->value} {
+            std::cout << "'deep copy' node ctor from unique_ptr&" << std::endl;
+            if (x->next) {
+                // this calls recursively this ctor
+                next.reset(new node{x->next});
+            }
+        }
 
-			++_size;
-		}
+        node(const value_type &value, std::unique_ptr<node> &next)
+            : value{value}, next{std::move(next)} {
+            std::cout << "l-value node ctor" << std::endl;
+        }
 
-		std::unique_ptr<node> head;
-		std::size_t _size;
+        // copy and move semantics if needed
+        node(const node &rhs) = delete;
+        node &operator=(const node &rhs) = delete;
+
+        node(node &&rhs) = default;
+        node &operator=(node &&rhs) = default;
+
+        // destructor
+        ~node() = default;
+    };
+
+    // helper function with universal ref and forwarding
+    template <typename O> void _insert(O &&v, const Insertion_method m) {
+        switch (m) {
+        case Insertion_method::push_back:
+            this->push_back(std::forward<O>(v));
+            break;
+        case Insertion_method::push_front:
+            this->push_front(std::forward<O>(v));
+            break;
+        default:
+            break;
+        }
+    }
+
+    /*
+    //after having the universal ref versions, no need to overload the internals
+    void push_back(const value_type& v) {}
+    void push_front(const value_type& v) {}
+    */
+
+    // forwarding - compare with Effective Modern C++ items 24, 26, 27
+    // type deduction takes place, this is a universal reference and must use
+    // forward note: when outside class decl, templates for class and for funcs
+    // must be on different lines having type deduction makes these "universal
+    // references" eg: template<typename used_by_class, ...>
+    //    template<typename used_by_method, ...>
+    template <typename O> void push_back(O &&v) {
+        std::cout << "universal ref push_back" << std::endl;
+        if (head) {
+            auto *iter = head.get();
+            while (iter->next) {
+                iter = iter->next.get();
+            }
+
+            iter->next.reset(new node{std::forward<O>(v)});
+        } else {
+            head.reset(new node{std::forward<O>(v)});
+        }
+
+        ++_size;
+    }
+
+    template <typename O> void push_front(O &&v) {
+        std::cout << "universal ref push_front" << std::endl;
+        head.reset(new node{std::forward<O>(v), head.release()});
+        ++_size;
+    }
+
+    std::unique_ptr<node> head;
+    std::size_t _size;
 };
-
-template <class T>
-std::ostream& operator<<(std::ostream& os, const List<T>& l) {
-	l.pour(os);
-
-	return os;
-}
 
 #endif
