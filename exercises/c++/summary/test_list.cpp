@@ -1,4 +1,6 @@
 #include <iostream>
+#include <vector>
+#include <algorithm>
 
 #include "List.hpp"
 
@@ -47,6 +49,27 @@ int main(void) {
     list5.reset();
     std::cout << "after reset: " << list5 << "\n";
     std::cout.flush();
+
+	list = new List<int>{};
+	for (int i = 0; i < nodes; ++i) {
+		list->insert(i, static_cast<Insertion_method>((1 + i) % 2));
+	}
+	std::cout << "after alternating push_*: " << *list << "\n";
+	//std::sort(list->begin(), list->end());
+	//std::cout << "after sort: " << *list << "\n";
+	std::cout << "range-based for: [";
+	for (const auto& v: *list) {
+		std::cout << v << " ";
+	}
+	std::cout << "]" << std::endl;
+
+	std::vector<int> vector(list->size());
+	std::copy(list->begin(), list->end(), vector.begin());
+	std::cout << "copied into vector: [";
+	for (const auto& v: vector) {
+		std::cout << v << " ";
+	}
+	std::cout << "]" << std::endl;
 
     // the first was moved from an empty list, the second from a non-empty one
     // without deletes, valgrind shows only 32B lost, thus the move to non-empty

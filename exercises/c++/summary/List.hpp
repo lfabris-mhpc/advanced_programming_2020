@@ -2,6 +2,7 @@
 #define __LIST_HPP__
 
 #include <iostream>
+#include <iterator>
 #include <memory>
 #include <utility>
 
@@ -9,6 +10,35 @@ enum class Insertion_method { push_back, push_front };
 
 template <class value_type> class List {
 public:
+	template<typename O>
+	class _iterator;
+
+	using iterator = _iterator<value_type>;
+	using const_iterator = _iterator<const value_type>;
+
+	iterator begin() noexcept {
+		return iterator{head.get()};
+	}
+	iterator end() noexcept {
+		return iterator{nullptr};
+	}
+
+	const_iterator begin() const noexcept {
+		return const_iterator{head.get()};
+	}
+	const_iterator end() const noexcept {
+		return const_iterator{nullptr};
+	}
+
+	/*
+	const_iterator cbegin() const noexcept {
+		return const_iterator{head.get()};
+	}
+	const_iterator cend() const noexcept {
+		return const_iterator{nullptr};
+	}
+	*/
+
     // insert a new node with the value v according to the method m
     // this method should be used to fill the list
     // two flavors: one with l-value refs, one with l-value refs
@@ -179,6 +209,55 @@ private:
 
     std::unique_ptr<node> head;
     std::size_t _size;
+};
+
+//iterator outside class - first template arg is for the List that contains the forward declaration
+template<typename T>
+template<typename O>
+class List<T>::_iterator {
+	//the typename is necessary due to the T belonging to another class
+	using node = typename List<T>::node;
+	node* current;
+public:
+	using value_type = O;
+	using reference = value_type&;
+	using pointer = value_type*;
+	using difference_type = std::ptrdiff_t;
+	using iterator_category = std::forward_iterator_tag;
+
+	//think if ok: explicit
+	_iterator(node* v): current{v} {
+	}
+
+	reference operator*() const {
+		return current->value;
+	}
+
+	pointer operator->() const {
+		return &**this;
+	}
+
+	//preincrement
+	_iterator& operator++() {
+		current = current->next.get();
+		return *this;
+	}
+	//postincrement
+	_iterator operator++(int) {
+		auto tmp{*this};
+		++(*this);
+		return tmp;
+	}
+
+	friend
+	bool operator==(_iterator& lhs, _iterator& rhs) {
+		return lhs.current == rhs.current;
+	}
+	
+	friend
+	bool operator!=(_iterator& lhs, _iterator& rhs) {
+		return !(lhs == rhs);
+	}
 };
 
 #endif
